@@ -14,14 +14,11 @@
 //   console.log(`Server is running on http://localhost:${port}`);
 // });
 
-
-
-
-import http from 'http';
-import { Server } from 'socket.io';
-import app from './app.js'; // ✅ default import
-import { connectDb } from './config/connectDb.js';
-import handleWebSocket from './socket/websocketLogic.js';
+import http from "http";
+import { Server } from "socket.io";
+import app from "./app.js"; // ✅ default import
+import { connectDb } from "./config/connectDb.js";
+import handleWebSocket from "./socket/websocketLogic.js";
 
 const server = http.createServer(app); // ✅ app is a function
 const io = new Server(server, {
