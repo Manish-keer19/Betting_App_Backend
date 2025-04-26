@@ -24,7 +24,10 @@ const server = http.createServer(app); // ✅ app is a function
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST"," PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+    // credentials: true,
+    
   },
 });
 

@@ -211,6 +211,12 @@ export default function handleWebSocket(io) {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
+    // Track connected socket
+    socket.on("registerUser", (userId) => {
+      console.log("User registered:", userId);
+      socket.join(userId.toString()); // join room even if user didn't bet
+    });
+
     socket.emit("currentRound", {
       roundId: currentRound.roundId,
       startedAt: currentRound.createdAt,
@@ -276,8 +282,8 @@ export default function handleWebSocket(io) {
     if (head === tail) {
       result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
     } else {
-      // result = head < tail ? "head" : "tail";
-      result = "head";
+      result = head < tail ? "head" : "tail";
+      // result = "head";
     }
 
     const winners = currentRound.players.filter((p) => p.choice === result);
