@@ -117,7 +117,6 @@ export const getAllPendingWithdraws = async (req, res) => {
     //   .populate("user")
     //   .exec();
 
-
     const pendingWithdraws = await WithdrawHistory.find({
       status: "PENDING",
     }).populate({
@@ -292,16 +291,17 @@ export const getAllApprovedDeposits = async (req, res) => {
 export const getAllApprovedWithdraws = async (req, res) => {
   try {
     const approvedWithdraws = await WithdrawHistory.find({ status: "APPROVED" })
-    .populate({
-      path: "user",
-      populate: {
-        path: "BankDetails",
-        model: "BankDetail", // This must match your model name exactly
-      },
-    })// Populate bank details (optional)
-      
+      .populate({
+        path: "user",
+        populate: {
+          path: "BankDetails",
+          model: "BankDetail", // This must match your model name exactly
+        },
+      }) // Populate bank details (optional)
+
       // Populate user info (optional)
-      .sort({ createdAt: -1 }).exec(); // Newest first
+      .sort({ createdAt: -1 })
+      .exec(); // Newest first
 
     res.status(200).json({
       success: true,

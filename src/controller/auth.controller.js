@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { getRandomAvatar } from "../utils/avatarGenerator.js";
+import { changePasswordTemplate } from "../templets/changePasswordTemplete.js";
+import { sendMail } from "../utils/sendMail.js";
+import { resetPasswordTemplate } from "../templets/resetPasswordTemplate.js";
 
 dotenv.config();
 
@@ -178,7 +181,7 @@ export const Signup = async (req, res) => {
       await referrer.save();
     }
 
-    const profilePic =  getRandomAvatar();
+    const profilePic = getRandomAvatar();
     console.log("profilePic is ", profilePic);
 
     const newUser = await User.create({
@@ -484,3 +487,125 @@ export const Login = async (req, res) => {
 //     });
 //   }
 // };
+
+export const changePassword = async (req, res) => {
+  try {
+    // fetch the data from req.body
+    // get oldPassword newPassword confirme the password
+    const { email, oldPassword, newPassword } = req.body;
+
+    // validate
+    if (!oldPassword || !newPassword) {
+      return res.json({
+        success: false,
+        message: "all feild must be filled",
+      });
+    }
+
+    // check if password is right or not :
+    const user = await User.findOne({ email });
+    console.log("user is ", user);
+
+    //  campare the password saved in db to sent by user pass
+
+    const compare = await bcrypt.compare(oldPassword, user.password);
+    // console.log("bcrypt compare response is :", compare);
+    if (!compare) {
+      return res.json({
+        success: false,
+        message: "old password is incorrect please enter the right password",
+      });
+    }
+    // update the password in db:
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      { _id: user._id },
+      { $set: { password: hashedPassword } },
+      { new: true }
+    );
+
+    console.log("udpated user is ", updatedUser);
+
+    // send mail password in updated
+    let htmlcontent = changePasswordTemplate(updatedUser.username);
+    sendMail(updatedUser.email, "for password quries", htmlcontent);
+    // return res
+    return res.json({
+      success: true,
+      message: "password has been update",
+    });
+  } catch (error) {
+    console.log("error in change password ", error);
+    return res.json({
+      success: false,
+      message: "could not change the password",
+      error,
+    });
+  }
+};
+
+export const ResetPassword = async (req, res) => {
+  // fetch the email password otp from req.body
+  // validate it
+  // check if user user exists or not
+  // check if otp is correct or not
+  // update the password
+  // return success response
+
+  try {
+    // fetch the email password otp from req.body
+    const { email, password, otp } = req.body;
+    console.log("email is ", email);
+    console.log("password is ", password);
+    console.log("otp is ", otp);
+    // validate it
+    if (!email || !password || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+    // check if user user exists or not
+    const isUserExist = await User.findOne({ email: email });
+
+    if (!isUserExist) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    const dbotp = await Otp.findOne({ email: email });
+    console.log("dbotp is ", dbotp);
+    if (dbotp?.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+    if (dbotp?.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+
+    // update the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.updateOne({ email: email }, { password: hashedPassword });
+
+    let htmlcontent = resetPasswordTemplate(isUserExist.username);
+    sendMail(isUserExist.email, "for password quries", htmlcontent);
+    // return success response
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    console.log("could not reset the password", error);
+    return res.status(500).json({
+      success: false,
+      message: "could not reset the password",
+    });
+  }
+};
