@@ -52,7 +52,7 @@ export const generateOtp = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "OTP generated successfully",
-      otp, // Optionally return the generated OTP
+      // otp, // Optionally return the generated OTP
     });
   } catch (error) {
     console.log("error while generating OTP", error); // Added error logging

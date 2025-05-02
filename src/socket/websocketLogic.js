@@ -207,14 +207,19 @@ let currentRound = {
   totals: { head: 0, tail: 0 }, // track total bet amounts
 };
 
+let RoomName = "";
+
 export default function handleWebSocket(io) {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
     // Track connected socket
-    socket.on("registerUser", (userId) => {
-      console.log("User registered:", userId);
-      socket.join(userId.toString()); // join room even if user didn't bet
+    socket.on("registerUser", (roomName) => {
+      RoomName = roomName;
+      console.log("User registered:", roomName);
+      socket.join(roomName); // join room even if user didn't bet
+
+      io.to(roomName).emit("userRegistered", roomName);
     });
 
     socket.emit("currentRound", {
@@ -246,7 +251,6 @@ export default function handleWebSocket(io) {
 
         // Update round info
         currentRound.players.push({ userId, choice, amount });
-
         // Add to total amount per choice
         currentRound.totals[choice] += amount;
 
@@ -309,6 +313,23 @@ export default function handleWebSocket(io) {
 
     // Emit round result to all clients
     io.emit("roundResult", {
+      roundId: currentRound.roundId,
+      result,
+      players: currentRound.players,
+      totals: currentRound.totals,
+    });
+
+    // io.to(RoomName).emit("roundResultToAll", {
+    //   roundId: currentRound.roundId,
+    //   result,
+    //   players: currentRound.players,
+    //   totals: currentRound.totals,
+
+    // });
+
+    console.log("RoomName", RoomName);
+    io.to(RoomName).emit("roundResultToAll", {
+      room: RoomName, // Add this
       roundId: currentRound.roundId,
       result,
       players: currentRound.players,
