@@ -264,20 +264,20 @@ export default function handleWebSocket(io) {
   });
 
   setInterval(async () => {
-    if (currentRound.players.length === 0) {
-      // No bets - start a new round
-      currentRound = {
-        roundId: Date.now().toString(),
-        players: [],
-        createdAt: new Date(),
-        totals: { head: 0, tail: 0 },
-      };
-      io.emit("newRound", {
-        roundId: currentRound.roundId,
-        startedAt: currentRound.createdAt,
-      });
-      return;
-    }
+    // if (currentRound.players.length === 0) {
+    //   // No bets - start a new round
+    //   currentRound = {
+    //     roundId: Date.now().toString(),
+    //     players: [],
+    //     createdAt: new Date(),
+    //     totals: { head: 0, tail: 0 },
+    //   };
+    //   io.emit("newRound", {
+    //     roundId: currentRound.roundId,
+    //     startedAt: currentRound.createdAt,
+    //   });
+    //   return;
+    // }
 
     // Determine winning side: one with less total amount
     const { head, tail } = currentRound.totals;
