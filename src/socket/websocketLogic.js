@@ -283,12 +283,14 @@ export default function handleWebSocket(io) {
     const { head, tail } = currentRound.totals;
     let result = null;
 
-    if (head === tail) {
-      result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
-    } else {
-      result = head < tail ? "head" : "tail";
-      // result = "head";
-    }
+    result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
+    // result = "head";
+    // if (head === tail) {
+    //   result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
+    // } else {
+    //   result = head < tail ? "head" : "tail";
+    //   // result = "head";
+    // }
 
     const winners = currentRound.players.filter((p) => p.choice === result);
     const updatePromises = winners.map(async (player) => {
@@ -337,14 +339,14 @@ export default function handleWebSocket(io) {
     });
 
     // Send win notification AFTER all updates
-    winners.forEach((player) => {
-      if (player.payout) {
-        io.to(player.userId.toString()).emit("wonMessage", {
-          message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
-          amount: player.payout,
-        });
-      }
-    });
+    // winners.forEach((player) => {
+    //   if (player.payout) {
+    //     io.to(RoomName).emit("wonMessage", {
+    //       message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
+    //       amount: player.payout,
+    //     });
+    //   }
+    // });
 
     // Start new round
     currentRound = {
