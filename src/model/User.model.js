@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
 
     DateOfBirth: {
       type: Date,
-      required: true,
+  
     },
   },
   { timestamps: true }
