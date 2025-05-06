@@ -168,12 +168,12 @@ export const verfyWithdraw = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    if (user.balance < withdraw.amount) {
-      return res.status(400).json({
-        success: false,
-        message: "Insufficient balance at verification",
-      });
-    }
+    // if (user.balance < withdraw.amount) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Insufficient balance at verification",
+    //   });
+    // }
     withdraw.status = "APPROVED";
     await withdraw.save();
 
