@@ -19,6 +19,7 @@ import { Server } from "socket.io";
 import app from "./app.js"; // ✅ default import
 import { connectDb } from "./config/connectDb.js";
 import handleWebSocket from "./socket/websocketLogic.js";
+import { getRandomAvatar } from "./utils/avatarGenerator.js";
 
 const server = http.createServer(app); // ✅ app is a function
 const io = new Server(server, {
@@ -30,6 +31,8 @@ const io = new Server(server, {
     
   },
 });
+
+// console.log(getRandomAvatar()); // Call the function to generate a random avatar URL
 
 connectDb();
 handleWebSocket(io);
