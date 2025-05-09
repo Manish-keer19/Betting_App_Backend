@@ -128,6 +128,91 @@ const generateReferralCode = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+// export const Signup = async (req, res) => {
+//   try {
+//     console.log("req.body is ", req.body);
+//     const { username, email, password, otp, role, referralCode, dateOfBirth } =
+//       req.body;
+
+//     if (!username || !email || !password || !otp || !dateOfBirth) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required",
+//       });
+//     }
+
+//     const existingUser = await User.findOne({ email: email });
+
+//     if (existingUser) {
+//       return res.json({
+//         success: false,
+//         message: "User already exists",
+//       });
+//     }
+
+//     const dbotp = await Otp.findOne({ email: email });
+//     if (dbotp?.otp !== otp) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid OTP",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Initialize wallet with ₹30 if referred
+//     let walletAmount = 0;
+//     let referredBy = null;
+
+//     if (referralCode) {
+//       const referrer = await User.findOne({ referralCode: referralCode });
+
+//       if (!referrer) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid referral code",
+//         });
+//       }
+
+//       // Reward both users
+//       walletAmount = 50;
+//       referredBy = referralCode;
+
+//       referrer.balance = (referrer.balance || 0) + 300;
+//       await referrer.save();
+//     }
+
+//     const profilePic = getRandomAvatar();
+//     console.log("profilePic is ", profilePic);
+
+//     const newUser = await User.create({
+//       username,
+//       email,
+//       password: hashedPassword,
+//       balance: walletAmount,
+//       referredBy: referredBy,
+//       referralCode: generateReferralCode(),
+//       DateOfBirth: dateOfBirth,
+//       profilePic:
+//         profilePic ||
+//         "https://res.cloudinary.com/degag862k/image/upload/v1744893491/WhatsApp_Image_2025-04-17_at_09.07.23_19048e01_fk6hmm.jpg",
+//       Role: "USER",
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "User created successfully",
+//       data: newUser,
+//     });
+//   } catch (error) {
+//     console.log("error is ", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Could not signup the user",
+//     });
+//   }
+// };
+
 export const Signup = async (req, res) => {
   try {
     console.log("req.body is ", req.body);
@@ -141,17 +226,17 @@ export const Signup = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email: email });
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         message: "User already exists",
       });
     }
 
-    const dbotp = await Otp.findOne({ email: email });
-    if (dbotp?.otp !== otp) {
+    const dbotp = await Otp.findOne({ email });
+    if (!dbotp || dbotp.otp !== otp) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
@@ -160,12 +245,12 @@ export const Signup = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Initialize wallet with ₹30 if referred
     let walletAmount = 0;
     let referredBy = null;
+    let bonusAmount = 0;
 
     if (referralCode) {
-      const referrer = await User.findOne({ referralCode: referralCode });
+      const referrer = await User.findOne({ referralCode });
 
       if (!referrer) {
         return res.status(400).json({
@@ -174,22 +259,27 @@ export const Signup = async (req, res) => {
         });
       }
 
-      // Reward both users
-      walletAmount = 30;
+      if (referrer.referralCode === referralCode) {
+        bonusAmount = 50; // Bonus for the new user
+        walletAmount = 50; // Wallet amount for the new user
+      }
+
       referredBy = referralCode;
 
-      referrer.balance = (referrer.balance || 0) + 50;
+      // Reward referrer
+      referrer.balance = (referrer.balance || 0) + 300;
       await referrer.save();
     }
 
-    const profilePic = getRandomAvatar();
-    console.log("profilePic is ", profilePic);
+    const profilePic = getRandomAvatar(); // Optional: fallback image logic
 
     const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
       balance: walletAmount,
+      bonusAmount: bonusAmount,
+      bonusPlayedAmount: 0,
       referredBy: referredBy,
       referralCode: generateReferralCode(),
       DateOfBirth: dateOfBirth,
@@ -202,17 +292,24 @@ export const Signup = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "User created successfully",
-      data: newUser,
+      data: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        balance: newUser.balance,
+        bonusAmount: newUser.bonusAmount,
+        bonusPlayedAmount: newUser.bonusPlayedAmount,
+        referralCode: newUser.referralCode,
+      },
     });
   } catch (error) {
-    console.log("error is ", error);
+    console.log("Signup error: ", error);
     return res.status(500).json({
       success: false,
       message: "Could not signup the user",
     });
   }
 };
-
 export const Login = async (req, res) => {
   console.log("req.body is ", req.body);
   try {

@@ -4,11 +4,13 @@ import {
   DipositMoney,
   getUserBalance,
   getUserBankDetails,
+  getUserBonus,
   getUserDeposits,
   getUserWithdrawHistory,
   SaveUserBankDetails,
   withdrawMoney,
 } from "../controller/User.controller.js";
+import { assignReferralCodes } from "../controller/assignReffralCode.js";
 
 const userRoute = Router();
 
@@ -31,4 +33,13 @@ userRoute.get(
   authentication,
   getUserBankDetails
 );
+userRoute.get(
+  "/get-user-bonus/:userId",
+  authentication,
+  getUserBonus
+);
+
+userRoute.get("/assign-referrals", assignReferralCodes);
+
+
 export default userRoute;

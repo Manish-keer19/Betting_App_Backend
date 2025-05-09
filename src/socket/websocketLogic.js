@@ -246,7 +246,22 @@ export default function handleWebSocket(io) {
           return;
         }
 
-        user.balance -= amount;
+        // user.balance -= amount;
+
+        user.balance -= amount; // Always deduct full amount from balance
+
+        if (user.bonusAmount > 0) {
+          if (user.bonusAmount >= amount) {
+            // Case 1: Bonus is more than or equal to amount
+            user.bonusAmount -= amount;
+            user.bonusPlayedAmount += amount;
+          } else {
+            // Case 2: Bonus is less than amount
+            user.bonusPlayedAmount += user.bonusAmount;
+            user.bonusAmount = 0;
+          }
+        }
+
         await user.save();
 
         // Update round info
@@ -283,8 +298,8 @@ export default function handleWebSocket(io) {
     const { head, tail } = currentRound.totals;
     let result = null;
 
-    result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
-    // result = "head";
+    // result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
+    result = "head";
     // if (head === tail) {
     //   result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
     // } else {
@@ -339,14 +354,14 @@ export default function handleWebSocket(io) {
     });
 
     // Send win notification AFTER all updates
-    // winners.forEach((player) => {
-    //   if (player.payout) {
-    //     io.to(RoomName).emit("wonMessage", {
-    //       message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
-    //       amount: player.payout,
-    //     });
-    //   }
-    // });
+    winners.forEach((player) => {
+      if (player.payout) {
+        io.to(RoomName).emit("wonMessage", {
+          message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
+          amount: player.payout,
+        });
+      }
+    });
 
     // Start new round
     currentRound = {

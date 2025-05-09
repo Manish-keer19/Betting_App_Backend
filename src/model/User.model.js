@@ -34,8 +34,17 @@ const userSchema = new mongoose.Schema(
 
     DateOfBirth: {
       type: Date,
-  
     },
+
+    bonusAmount: {
+  type: Number,
+  default: 0, // Amount of bonus credited (e.g., 300)
+},
+bonusPlayedAmount: {
+  type: Number,
+  default: 0, // How much of that bonus the user has played so far
+},
+
   },
   { timestamps: true }
 );
