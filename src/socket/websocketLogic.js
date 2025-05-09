@@ -298,8 +298,8 @@ export default function handleWebSocket(io) {
     const { head, tail } = currentRound.totals;
     let result = null;
 
-    // result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
-    result = "head";
+    result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
+    // result = "head";
     // if (head === tail) {
     //   result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
     // } else {
