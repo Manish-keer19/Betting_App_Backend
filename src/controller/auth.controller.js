@@ -360,9 +360,14 @@ export const Login = async (req, res) => {
       });
     }
 
+    // const token = jwt.sign(payload, JWT_SECRET, {
+    //   expiresIn: "1d",
+    // });
+
     const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: "1d",
+      expiresIn: "15d",
     });
+
     const JWT_SECRET_REFRESH = process.env.JWT_SECRET;
     if (!JWT_SECRET_REFRESH) {
       return res.status(500).json({

@@ -227,55 +227,120 @@ export default function handleWebSocket(io) {
       startedAt: currentRound.createdAt,
     });
 
+    // socket.on("placeBet", async ({ userId, choice, amount, roundId }) => {
+    //   try {
+    //     if (roundId !== currentRound.roundId) {
+    //       socket.emit("error", "This round has already ended");
+    //       return;
+    //     }
+    //     socket.join(userId.toString());
+
+    //     const user = await User.findById(userId);
+    //     if (!user) {
+    //       socket.emit("error", "User not found");
+    //       return;
+    //     }
+
+    //     if (user.balance < amount) {
+    //       socket.emit("error", "Insufficient balance");
+    //       return;
+    //     }
+
+    //     // user.balance -= amount;
+
+    //     user.balance -= amount; // Always deduct full amount from balance
+
+    //     if (user.bonusAmount > 0) {
+    //       if (user.bonusAmount >= amount) {
+    //         // Case 1: Bonus is more than or equal to amount
+    //         user.bonusAmount -= amount;
+    //         user.bonusPlayedAmount += amount;
+    //       } else {
+    //         // Case 2: Bonus is less than amount
+    //         user.bonusPlayedAmount += user.bonusAmount;
+    //         user.bonusAmount = 0;
+    //       }
+    //     }
+
+    //     await user.save();
+
+    //     // Update round info
+    //     currentRound.players.push({ userId, choice, amount });
+    //     // Add to total amount per choice
+    //     currentRound.totals[choice] += amount;
+
+    //     socket.emit("betPlaced", { amount, choice });
+    //     socket.emit("balanceUpdate", { balance: user.balance });
+    //   } catch (error) {
+    //     console.error("Error placing bet:", error);
+    //     socket.emit("error", "Failed to place bet");
+    //   }
+    // });
+  
+  
+
     socket.on("placeBet", async ({ userId, choice, amount, roundId }) => {
-      try {
-        if (roundId !== currentRound.roundId) {
-          socket.emit("error", "This round has already ended");
-          return;
-        }
-        socket.join(userId.toString());
+  try {
+    if (roundId !== currentRound.roundId) {
+      return socket.emit("error", "This round has already ended");
+    }
 
-        const user = await User.findById(userId);
-        if (!user) {
-          socket.emit("error", "User not found");
-          return;
-        }
+    // Join user-specific room to send private messages
+    socket.join(userId.toString());
 
-        if (user.balance < amount) {
-          socket.emit("error", "Insufficient balance");
-          return;
-        }
+    // Use lean for faster fetch (no Mongoose wrapper)
+    const userDoc = await User.findById(userId).select("balance bonusAmount bonusPlayedAmount").lean();
 
-        // user.balance -= amount;
+    if (!userDoc) {
+      return socket.emit("error", "User not found");
+    }
 
-        user.balance -= amount; // Always deduct full amount from balance
+    // Check balance before processing
+    if (userDoc.balance < amount) {
+      return socket.emit("error", "Insufficient balance");
+    }
 
-        if (user.bonusAmount > 0) {
-          if (user.bonusAmount >= amount) {
-            // Case 1: Bonus is more than or equal to amount
-            user.bonusAmount -= amount;
-            user.bonusPlayedAmount += amount;
-          } else {
-            // Case 2: Bonus is less than amount
-            user.bonusPlayedAmount += user.bonusAmount;
-            user.bonusAmount = 0;
-          }
-        }
+    // Prepare updated values (logic offloaded here)
+    const newBalance = userDoc.balance - amount;
+    let updatedBonusAmount = userDoc.bonusAmount;
+    let updatedBonusPlayed = userDoc.bonusPlayedAmount;
 
-        await user.save();
-
-        // Update round info
-        currentRound.players.push({ userId, choice, amount });
-        // Add to total amount per choice
-        currentRound.totals[choice] += amount;
-
-        socket.emit("betPlaced", { amount, choice });
-        socket.emit("balanceUpdate", { balance: user.balance });
-      } catch (error) {
-        console.error("Error placing bet:", error);
-        socket.emit("error", "Failed to place bet");
+    if (userDoc.bonusAmount > 0) {
+      if (userDoc.bonusAmount >= amount) {
+        updatedBonusAmount -= amount;
+        updatedBonusPlayed += amount;
+      } else {
+        updatedBonusPlayed += updatedBonusAmount;
+        updatedBonusAmount = 0;
       }
-    });
+    }
+
+    // Update only required fields (atomic update)
+    await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          balance: newBalance,
+          bonusAmount: updatedBonusAmount,
+          bonusPlayedAmount: updatedBonusPlayed,
+        },
+      }
+    );
+
+    // ✅ Store player info (in-memory only)
+    currentRound.players.push({ userId, choice, amount });
+    currentRound.totals[choice] += amount;
+
+    // ✅ Respond immediately to frontend
+    socket.emit("betPlaced", { amount, choice });
+    socket.emit("balanceUpdate", { balance: newBalance });
+  } catch (error) {
+    console.error("Error placing bet:", error);
+    socket.emit("error", "Something went wrong. Try again.");
+  }
+});
+
+  
   });
 
   setInterval(async () => {
@@ -298,8 +363,8 @@ export default function handleWebSocket(io) {
     const { head, tail } = currentRound.totals;
     let result = null;
 
-    result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
-    // result = "head";
+    // result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
+    result = "head";
     // if (head === tail) {
     //   result = Math.random() < 0.5 ? "head" : "tail"; // tie → random
     // } else {
@@ -329,12 +394,12 @@ export default function handleWebSocket(io) {
     await Promise.all(updatePromises);
 
     // Emit round result to all clients
-    io.emit("roundResult", {
-      roundId: currentRound.roundId,
-      result,
-      players: currentRound.players,
-      totals: currentRound.totals,
-    });
+    // io.emit("roundResult", {
+    //   roundId: currentRound.roundId,
+    //   result,
+    //   players: currentRound.players,
+    //   totals: currentRound.totals,
+    // });
 
     // io.to(RoomName).emit("roundResultToAll", {
     //   roundId: currentRound.roundId,
@@ -344,7 +409,18 @@ export default function handleWebSocket(io) {
 
     // });
 
-    console.log("RoomName", RoomName);
+    // console.log("RoomName", RoomName);
+
+    // Send win notification AFTER all updates
+    // winners.forEach((player) => {
+    //   if (player.payout) {
+    //     io.to(RoomName).emit("wonMessage", {
+    //       message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
+    //       amount: player.payout,
+    //     });
+    //   }
+    // });
+
     io.to(RoomName).emit("roundResultToAll", {
       room: RoomName, // Add this
       roundId: currentRound.roundId,
@@ -353,12 +429,25 @@ export default function handleWebSocket(io) {
       totals: currentRound.totals,
     });
 
-    // Send win notification AFTER all updates
-    winners.forEach((player) => {
-      if (player.payout) {
-        io.to(RoomName).emit("wonMessage", {
-          message: `🎉 You won ₹${player.payout.toFixed(2)}!`,
-          amount: player.payout,
+    currentRound.players.forEach((player) => {
+      const isWinner = player.choice === result;
+
+      if (isWinner) {
+        const winAmount = player.amount * 1.95;
+        io.to(player.userId.toString()).emit("roundOutcome", {
+          result: "win",
+          choice: player.choice,
+          winningSide: result,
+          amount: winAmount,
+          message: `🎉 You won ₹${winAmount.toFixed(2)}!`,
+        });
+      } else {
+        io.to(player.userId.toString()).emit("roundOutcome", {
+          result: "lose",
+          choice: player.choice,
+          winningSide: result,
+          amount: 0,
+          message: `😢 You lost this round!`,
         });
       }
     });
@@ -375,5 +464,5 @@ export default function handleWebSocket(io) {
       roundId: currentRound.roundId,
       startedAt: currentRound.createdAt,
     });
-  }, 60000); // every minute
+  }, 30000); // every minute
 }
