@@ -36,10 +36,11 @@ export const verifyDeposit = async (req, res) => {
         message: "User not found",
       });
     }
+    console.log("user", user);
 
     user.balance += deposit.amount;
 
-    user.bonusAmount += deposit.bonusAmount;
+    user.bonusAmount += deposit.amount;
     await user.save();
 
     res.status(200).json({
