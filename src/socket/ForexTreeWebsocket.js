@@ -219,7 +219,6 @@
 //   }, 30000); // every minute
 // }
 
-
 import { User } from "../model/User.model.js";
 import mongoose from "mongoose";
 
@@ -249,7 +248,7 @@ export default function setupTradingWebSocket(io) {
         roundId: currentRound.roundId,
         result: currentRound.result,
         totals: { ...currentRound.totals },
-        endedAt: currentRound.endedAt
+        endedAt: currentRound.endedAt,
       });
 
       // Keep only last 10 rounds
@@ -263,7 +262,7 @@ export default function setupTradingWebSocket(io) {
     io.emit("newRound", {
       roundId: currentRound.roundId,
       startedAt: currentRound.createdAt,
-      history: roundHistory.slice(-5) // Send last 5 rounds for display
+      history: roundHistory.slice(-5), // Send last 5 rounds for display
     });
 
     // Schedule next round end
@@ -273,21 +272,27 @@ export default function setupTradingWebSocket(io) {
 
   const endCurrentRound = async () => {
     currentRound.endedAt = new Date();
-    
+
     // Determine result (50/50 chance)
-    currentRound.result = Math.random() < 0.5 ? "up" : "down";
+    // currentRound.result = Math.random() < 0.5 ? "up" : "down";
+    currentRound.result = "up";
 
     // Process winners
-    const winners = currentRound.players.filter(p => p.choice === currentRound.result);
+    const winners = currentRound.players.filter(
+      (p) => p.choice === currentRound.result
+    );
     const updatePromises = winners.map(async (player) => {
       try {
         const payout = player.amount * 1.95;
         await User.findByIdAndUpdate(player.userId, {
-          $inc: { balance: payout }
+          $inc: { balance: payout },
         });
         player.payout = payout;
       } catch (error) {
-        console.error(`Error processing payout for user ${player.userId}:`, error);
+        console.error(
+          `Error processing payout for user ${player.userId}:`,
+          error
+        );
       }
     });
 
@@ -298,22 +303,22 @@ export default function setupTradingWebSocket(io) {
       roundId: currentRound.roundId,
       result: currentRound.result,
       totals: currentRound.totals,
-      history: roundHistory.slice(-5)
+      history: roundHistory.slice(-5),
     });
 
     // Notify individual players
-    currentRound.players.forEach(player => {
+    currentRound.players.forEach((player) => {
       const isWinner = player.choice === currentRound.result;
       const winAmount = isWinner ? player.amount * 1.95 : 0;
-      
+
       io.to(player.userId.toString()).emit("roundOutcome", {
         result: isWinner ? "win" : "lose",
         choice: player.choice,
         winningSide: currentRound.result,
         amount: winAmount,
-        message: isWinner 
-          ? `🎉 You won ₹${winAmount.toFixed(2)}!` 
-          : `😢 You lost this round!`
+        message: isWinner
+          ? `🎉 You won ₹${winAmount.toFixed(2)}!`
+          : `😢 You lost this round!`,
       });
     });
 
@@ -327,18 +332,21 @@ export default function setupTradingWebSocket(io) {
     // Register user and join room
     socket.on("registerUser", (userId) => {
       if (!userId) return;
-      
+
       socket.join(userId.toString());
       socket.join("updownGame");
-      
+
       // Send current game state to newly connected user
       socket.emit("gameState", {
         currentRound: {
           roundId: currentRound.roundId,
           startedAt: currentRound.createdAt,
-          timeLeft: Math.max(0, ROUND_DURATION - (Date.now() - currentRound.createdAt.getTime()))
+          timeLeft: Math.max(
+            0,
+            ROUND_DURATION - (Date.now() - currentRound.createdAt.getTime())
+          ),
         },
-        history: roundHistory.slice(-5)
+        history: roundHistory.slice(-5),
       });
     });
 
@@ -363,10 +371,62 @@ export default function setupTradingWebSocket(io) {
           return socket.emit("error", "Insufficient balance");
         }
 
-        // Deduct balance
-        await User.findByIdAndUpdate(userId, {
-          $inc: { balance: -amount }
-        });
+        // // Deduct balance
+        // await User.findByIdAndUpdate(userId, {
+        //   $inc: { balance: -amount,
+
+        //    },
+
+        // });
+
+        // Use lean for faster fetch (no Mongoose wrapper)
+        const userDoc = await User.findById(userId)
+          .select("balance bonusAmount bonusPlayedAmount")
+          .lean();
+
+        if (!userDoc) {
+          return socket.emit("error", "User not found");
+        }
+
+        // Check if the total available balance (balance + bonus) is enough
+        const totalAvailable = userDoc.balance + userDoc.bonusAmount;
+        if (totalAvailable < amount) {
+          return socket.emit("error", "Insufficient total balance");
+        }
+
+        // Calculate how much to deduct from bonus and balance
+        let deductFromBonus = 0;
+        let deductFromBalance = 0;
+
+        if (userDoc.bonusAmount >= 1) {
+          if (userDoc.bonusAmount >= amount) {
+            deductFromBonus = amount;
+            deductFromBalance = 0;
+          } else {
+            deductFromBonus = userDoc.bonusAmount;
+            deductFromBalance = amount - deductFromBonus;
+          }
+        } else {
+          deductFromBonus = 0;
+          deductFromBalance = amount;
+        }
+
+        // Final values
+        const newBalance = userDoc.balance - deductFromBalance;
+        const updatedBonusAmount = userDoc.bonusAmount - deductFromBonus;
+        const updatedBonusPlayed = userDoc.bonusPlayedAmount + deductFromBonus;
+
+        // Atomic update
+        await User.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              balance: newBalance,
+              bonusAmount: updatedBonusAmount,
+              bonusPlayedAmount: updatedBonusPlayed,
+            },
+          }
+        );
 
         // Record bet
         currentRound.players.push({ userId, choice, amount });
@@ -375,7 +435,6 @@ export default function setupTradingWebSocket(io) {
         // Notify user
         socket.emit("betPlaced", { amount, choice });
         socket.emit("balanceUpdate", { balance: user.balance - amount });
-
       } catch (error) {
         console.log("error msg is ", error);
         console.error("Error placing bet:", error);

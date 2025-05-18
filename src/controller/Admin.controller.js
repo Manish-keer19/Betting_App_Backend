@@ -38,6 +38,8 @@ export const verifyDeposit = async (req, res) => {
     }
 
     user.balance += deposit.amount;
+
+    user.bonusAmount += deposit.bonusAmount;
     await user.save();
 
     res.status(200).json({
