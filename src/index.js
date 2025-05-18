@@ -21,6 +21,8 @@ import { connectDb } from "./config/connectDb.js";
 import handleWebSocket from "./socket/websocketLogic.js";
 import { getRandomAvatar } from "./utils/avatarGenerator.js";
 import handleWheelGame from "./socket/wheelGameSocket.js";
+// import setupTradingWebSocket from "./socket/ForexTreeWebsocket.js";
+import setupTradingWebSocket from "./socket/ForexTreeWebsocket.js";
 
 
 const server = http.createServer(app); // ✅ app is a function
@@ -38,6 +40,8 @@ const io = new Server(server, {
 connectDb();
 handleWebSocket(io);
 handleWheelGame(io);
+setupTradingWebSocket(io);
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

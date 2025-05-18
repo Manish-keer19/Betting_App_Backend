@@ -276,71 +276,69 @@ export default function handleWebSocket(io) {
     //     socket.emit("error", "Failed to place bet");
     //   }
     // });
-  
-  
 
     socket.on("placeBet", async ({ userId, choice, amount, roundId }) => {
-  try {
-    if (roundId !== currentRound.roundId) {
-      return socket.emit("error", "This round has already ended");
-    }
+      try {
+        if (roundId !== currentRound.roundId) {
+          return socket.emit("error", "This round has already ended");
+        }
 
-    // Join user-specific room to send private messages
-    socket.join(userId.toString());
+        // Join user-specific room to send private messages
+        socket.join(userId.toString());
 
-    // Use lean for faster fetch (no Mongoose wrapper)
-    const userDoc = await User.findById(userId).select("balance bonusAmount bonusPlayedAmount").lean();
+        // Use lean for faster fetch (no Mongoose wrapper)
+        const userDoc = await User.findById(userId)
+          .select("balance bonusAmount bonusPlayedAmount")
+          .lean();
 
-    if (!userDoc) {
-      return socket.emit("error", "User not found");
-    }
+        if (!userDoc) {
+          return socket.emit("error", "User not found");
+        }
 
-    // Check balance before processing
-    if (userDoc.balance < amount) {
-      return socket.emit("error", "Insufficient balance");
-    }
+        // Check balance before processing
+        if (userDoc.balance < amount) {
+          return socket.emit("error", "Insufficient balance");
+        }
 
-    // Prepare updated values (logic offloaded here)
-    const newBalance = userDoc.balance - amount;
-    let updatedBonusAmount = userDoc.bonusAmount;
-    let updatedBonusPlayed = userDoc.bonusPlayedAmount;
+        // Prepare updated values (logic offloaded here)
+        const newBalance = userDoc.balance - amount;
+        let updatedBonusAmount = userDoc.bonusAmount;
+        let updatedBonusPlayed = userDoc.bonusPlayedAmount;
 
-    if (userDoc.bonusAmount > 0) {
-      if (userDoc.bonusAmount >= amount) {
-        updatedBonusAmount -= amount;
-        updatedBonusPlayed += amount;
-      } else {
-        updatedBonusPlayed += updatedBonusAmount;
-        updatedBonusAmount = 0;
+        if (userDoc.bonusAmount > 0) {
+          if (userDoc.bonusAmount >= amount) {
+            updatedBonusAmount -= amount;
+            updatedBonusPlayed += amount;
+          } else {
+            updatedBonusPlayed += updatedBonusAmount;
+            updatedBonusAmount = 0;
+          }
+        }
+
+        // Update only required fields (atomic update)
+        await User.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              balance: newBalance,
+              bonusAmount: updatedBonusAmount,
+              bonusPlayedAmount: updatedBonusPlayed,
+            },
+          }
+        );
+
+        // ✅ Store player info (in-memory only)
+        currentRound.players.push({ userId, choice, amount });
+        currentRound.totals[choice] += amount;
+
+        // ✅ Respond immediately to frontend
+        socket.emit("betPlaced", { amount, choice });
+        socket.emit("balanceUpdate", { balance: newBalance });
+      } catch (error) {
+        console.error("Error placing bet:", error);
+        socket.emit("error", "Something went wrong. Try again.");
       }
-    }
-
-    // Update only required fields (atomic update)
-    await User.updateOne(
-      { _id: userId },
-      {
-        $set: {
-          balance: newBalance,
-          bonusAmount: updatedBonusAmount,
-          bonusPlayedAmount: updatedBonusPlayed,
-        },
-      }
-    );
-
-    // ✅ Store player info (in-memory only)
-    currentRound.players.push({ userId, choice, amount });
-    currentRound.totals[choice] += amount;
-
-    // ✅ Respond immediately to frontend
-    socket.emit("betPlaced", { amount, choice });
-    socket.emit("balanceUpdate", { balance: newBalance });
-  } catch (error) {
-    console.error("Error placing bet:", error);
-    socket.emit("error", "Something went wrong. Try again.");
-  }
-});
-
-  
+    });
   });
 
   setInterval(async () => {
