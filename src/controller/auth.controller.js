@@ -267,10 +267,10 @@ export const Signup = async (req, res) => {
       referredBy = referralCode;
 
       // Reward referrer
-      referrer.balance = (referrer.balance || 0) + 300;
-      referrer.bonusAmount = (referrer.bonusAmount || 0) + 300;
-      console.log("referrer is ", referrer);
-      await referrer.save();
+      // referrer.balance = (referrer.balance || 0) + 300;
+      // referrer.bonusAmount = (referrer.bonusAmount || 0) + 300;
+      // console.log("referrer is ", referrer);
+      // await referrer.save();
     }
 
     const profilePic = getRandomAvatar(); // Optional: fallback image logic
