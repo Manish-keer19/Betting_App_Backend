@@ -43,6 +43,18 @@ export const verifyDeposit = async (req, res) => {
     user.bonusAmount += deposit.amount;
     await user.save();
 
+    const referredByUser = await User.findOne({
+      referralCode: user.referredBy,
+    });
+
+    console.log("refferedByUser", referredByUser);
+    if (referredByUser) {
+      // referedbyuser will get 5% of deposit
+      referredByUser.balance += deposit.amount * 0.05;
+      referredByUser.bonusAmount += deposit.amount * 0.05;
+      await referredByUser.save();
+    }
+
     res.status(200).json({
       success: true,
       message: "Deposit verified and balance updated",

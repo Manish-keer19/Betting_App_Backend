@@ -274,8 +274,8 @@ export default function setupTradingWebSocket(io) {
     currentRound.endedAt = new Date();
 
     // Determine result (50/50 chance)
-    // currentRound.result = Math.random() < 0.5 ? "up" : "down";
-    currentRound.result = "up";
+    currentRound.result = Math.random() < 0.5 ? "up" : "down";
+    // currentRound.result = "up";
 
     // Process winners
     const winners = currentRound.players.filter(
