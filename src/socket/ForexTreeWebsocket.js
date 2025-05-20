@@ -389,7 +389,7 @@ export default function setupTradingWebSocket(io) {
         }
 
         // Check if the total available balance (balance + bonus) is enough
-        const totalAvailable = userDoc.balance + userDoc.bonusAmount;
+        const totalAvailable = userDoc.balance;
         if (totalAvailable < amount) {
           return socket.emit("error", "Insufficient total balance");
         }

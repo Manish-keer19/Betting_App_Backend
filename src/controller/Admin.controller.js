@@ -38,9 +38,13 @@ export const verifyDeposit = async (req, res) => {
     }
     console.log("user", user);
 
-    user.balance += deposit.amount;
+    // Calculate 5% bonus
+    const bonusAmount = deposit.amount * 0.05;
+    console.log("bonusAmount", bonusAmount);
 
-    user.bonusAmount += deposit.amount;
+    user.balance += deposit.amount + bonusAmount;
+
+    user.bonusAmount += deposit.amount + bonusAmount;
     await user.save();
 
     const referredByUser = await User.findOne({
