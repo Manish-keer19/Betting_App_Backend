@@ -388,35 +388,22 @@ export default function setupTradingWebSocket(io) {
           return socket.emit("error", "User not found");
         }
 
-        // Check if the total available balance (balance + bonus) is enough
-        const totalAvailable = userDoc.balance;
-        if (totalAvailable < amount) {
-          return socket.emit("error", "Insufficient total balance");
-        }
+          // Prepare updated values (logic offloaded here)
+        const newBalance = userDoc.balance - amount;
+        let updatedBonusAmount = userDoc.bonusAmount;
+        let updatedBonusPlayed = userDoc.bonusPlayedAmount;
 
-        // Calculate how much to deduct from bonus and balance
-        let deductFromBonus = 0;
-        let deductFromBalance = 0;
-
-        if (userDoc.bonusAmount >= 1) {
+        if (userDoc.bonusAmount > 0) {
           if (userDoc.bonusAmount >= amount) {
-            deductFromBonus = amount;
-            deductFromBalance = 0;
+            updatedBonusAmount -= amount;
+            updatedBonusPlayed += amount;
           } else {
-            deductFromBonus = userDoc.bonusAmount;
-            deductFromBalance = amount - deductFromBonus;
+            updatedBonusPlayed += updatedBonusAmount;
+            updatedBonusAmount = 0;
           }
-        } else {
-          deductFromBonus = 0;
-          deductFromBalance = amount;
         }
 
-        // Final values
-        const newBalance = userDoc.balance - deductFromBalance;
-        const updatedBonusAmount = userDoc.bonusAmount - deductFromBonus;
-        const updatedBonusPlayed = userDoc.bonusPlayedAmount + deductFromBonus;
-
-        // Atomic update
+        // Update only required fields (atomic update)
         await User.updateOne(
           { _id: userId },
           {
