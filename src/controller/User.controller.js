@@ -4,6 +4,7 @@ import { Deposit } from "../model/Diposit.model.js";
 import { User } from "../model/User.model.js";
 import { WithdrawHistory } from "../model/withdraw.model.js";
 import { uploadInCloudinary } from "../utils/cloudinary.utils.js";
+import { UserBetHistory } from "../model/UserBetHistory.model.js";
 
 export const DipositMoney = async (req, res) => {
   try {
@@ -363,5 +364,54 @@ export const getUserBonus = async (req, res) => {
   } catch (error) {
     console.error("Error fetching user bonus:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getUserBetHistoryHeadTail = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const history = await UserBetHistory.find({ userId: userId })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    res.json({
+      success: true,
+      status: 200,
+      message: "Bet history fetched successfully",
+      data: history,
+    });
+  } catch (error) {
+    console.log("Error fetching history:", error);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+};
+
+
+// controllers/betHistory.controller.js
+
+export const getUserBetHistoryByGameType = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { gameType } = req.params; // or req.query if you prefer query params
+
+    const history = await UserBetHistory.find({ 
+      userId: userId,
+      gameType: gameType 
+    })
+    .sort({ createdAt: -1 })
+    .limit(20);
+
+    res.json({
+      success: true,
+      status: 200,
+      message: "Bet history fetched successfully",
+      data: history,
+    });
+  } catch (error) {
+    console.log("Error fetching history:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch history" 
+    });
   }
 };

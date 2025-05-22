@@ -199,6 +199,7 @@
 
 import { User } from "../model/User.model.js";
 import mongoose from "mongoose";
+import { UserBetHistory } from "../model/UserBetHistory.model.js";
 
 let currentRound = {
   roundId: Date.now().toString(),
@@ -283,6 +284,16 @@ export default function handleWebSocket(io) {
           return socket.emit("error", "This round has already ended");
         }
 
+        // Create bet history record
+        const betRecord = new UserBetHistory({
+          userId,
+          roundId,
+          choice,
+          amount,
+          // betAmount: amount,
+          result: "pending",
+        });
+        await betRecord.save();
         // Join user-specific room to send private messages
         socket.join(userId.toString());
 
@@ -369,6 +380,41 @@ export default function handleWebSocket(io) {
     //   result = head < tail ? "head" : "tail";
     //   // result = "head";
     // }
+
+    // 2. Get all pending bets for this round
+    const pendingBets = await UserBetHistory.find({
+      roundId: currentRound.roundId,
+      result: "pending",
+    });
+
+    // 3. Process each bet
+    const bulkUpdates = [];
+    // const winners = [];
+
+    for (const bet of pendingBets) {
+      const isWinner = bet.choice === result;
+      const payout = isWinner ? bet.amount * 1.95 : 0;
+
+      bulkUpdates.push({
+        updateOne: {
+          filter: { _id: bet._id },
+          update: {
+            $set: {
+              result: isWinner ? "win" : "lose",
+              payout,
+              updatedAt: new Date(),
+            },
+          },
+        },
+      });
+
+      // if (isWinner) winners.push({ userId: bet.userId, payout });
+    }
+
+    // 4. Execute all updates in bulk
+    if (bulkUpdates.length > 0) {
+      await UserBetHistory.bulkWrite(bulkUpdates);
+    }
 
     const winners = currentRound.players.filter((p) => p.choice === result);
     const updatePromises = winners.map(async (player) => {

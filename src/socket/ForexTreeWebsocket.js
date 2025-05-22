@@ -221,6 +221,7 @@
 
 import { User } from "../model/User.model.js";
 import mongoose from "mongoose";
+import { UserBetHistory } from "../model/UserBetHistory.model.js";
 
 const ROUND_DURATION = 30000; // 30 seconds
 const MAX_HISTORY = 10;
@@ -276,6 +277,41 @@ export default function setupTradingWebSocket(io) {
     // Determine result (50/50 chance)
     currentRound.result = Math.random() < 0.5 ? "up" : "down";
     // currentRound.result = "up";
+
+    // 2. Get all pending bets for this round
+    const pendingBets = await UserBetHistory.find({
+      roundId: currentRound.roundId,
+      result: "pending",
+    });
+
+    // 3. Process each bet
+    const bulkUpdates = [];
+    // const winners = [];
+
+    for (const bet of pendingBets) {
+      const isWinner = bet.choice === currentRound.result;
+      const payout = isWinner ? bet.amount * 1.95 : 0;
+
+      bulkUpdates.push({
+        updateOne: {
+          filter: { _id: bet._id },
+          update: {
+            $set: {
+              result: isWinner ? "win" : "lose",
+              payout,
+              updatedAt: new Date(),
+            },
+          },
+        },
+      });
+
+      // if (isWinner) winners.push({ userId: bet.userId, payout });
+    }
+
+    // 4. Execute all updates in bulk
+    if (bulkUpdates.length > 0) {
+      await UserBetHistory.bulkWrite(bulkUpdates);
+    }
 
     // Process winners
     const winners = currentRound.players.filter(
@@ -367,6 +403,17 @@ export default function setupTradingWebSocket(io) {
         // Check balance
         const user = await User.findById(userId);
         if (!user) return socket.emit("error", "User not found");
+
+        const betRecord = new UserBetHistory({
+          gameType: "ForexTree",
+          userId,
+          roundId:currentRound.roundId,
+          choice,
+          amount,
+          // betAmount: amount,
+          result: "pending",
+        });
+        await betRecord.save();
         if (user.balance < amount) {
           return socket.emit("error", "Insufficient balance");
         }
@@ -388,7 +435,7 @@ export default function setupTradingWebSocket(io) {
           return socket.emit("error", "User not found");
         }
 
-          // Prepare updated values (logic offloaded here)
+        // Prepare updated values (logic offloaded here)
         const newBalance = userDoc.balance - amount;
         let updatedBonusAmount = userDoc.bonusAmount;
         let updatedBonusPlayed = userDoc.bonusPlayedAmount;
