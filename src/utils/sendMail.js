@@ -22,7 +22,7 @@ export const sendMail = async (
 
     // Sending mail using the transporter
     const info = await transporter.sendMail({
-      from: `"BetaBack" <${process.env.EMAIL_USER}>`, // Sender address updated to Instagram
+      from: `"Manish's Bet App" <${process.env.EMAIL_USER}>`, // Sender address updated to Instagram
       to: email, // List of receivers
       subject: title, // Subject line
       html: htmlContent, // HTML body

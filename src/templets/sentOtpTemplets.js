@@ -5,7 +5,7 @@ export const generateOtpTemplate = (userName, otp) => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Betaback OTP Verification</title>
+    <title>ManishBetApp OTP Verification</title>
     <style>
       body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -71,8 +71,8 @@ export const generateOtpTemplate = (userName, otp) => {
   <body>
     <div class="container">
       <div class="header">
-        <img src="https://res.cloudinary.com/degag862k/image/upload/v1744893491/WhatsApp_Image_2025-04-17_at_09.07.23_19048e01_fk6hmm.jpg" alt="Betaback Logo" />
-        <h1>Betaback</h1>
+        <img src="https://res.cloudinary.com/manish19/image/upload/v1749275262/manishbet_rffbom.png" alt="ManishBetApp Logo" />
+        <h1>ManishBetApp</h1>
       </div>
       <div class="message">
         Hi <strong>${userName}</strong>,<br/><br/>
@@ -81,7 +81,7 @@ export const generateOtpTemplate = (userName, otp) => {
       <div class="otp">${otp}</div>
       <div class="footer">
         If you didn’t request this, please ignore this email.<br/><br/>
-        &copy; ${new Date().getFullYear()} Betaback. All rights reserved.
+        &copy; ${new Date().getFullYear()} ManishBetApp. All rights reserved.
       </div>
     </div>
   </body>

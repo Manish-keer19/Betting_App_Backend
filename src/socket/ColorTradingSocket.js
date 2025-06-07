@@ -1,18 +1,22 @@
-
-
+// game.controller.js
 import { User } from "../model/User.model.js";
 import mongoose from "mongoose";
 import { UserBetHistory } from "../model/UserBetHistory.model.js";
 
 const ROUND_DURATION = 30000; // 30 seconds
 const MAX_HISTORY = 10;
+const PAYOUTS = {
+  red: 1.95,
+  green: 1.95,
+  blue: 5.0,
+};
 
 class GameRound {
   constructor() {
     this.roundId = Date.now().toString();
     this.players = [];
     this.createdAt = new Date();
-    this.totals = { up: 0, down: 0 };
+    this.totals = { red: 0, green: 0, blue: 0 };
     this.result = null;
     this.endedAt = null;
   }
@@ -24,7 +28,7 @@ const getTimeRemaining = (round) => {
   return Math.max(0, ROUND_DURATION - elapsed);
 };
 
-export default function setupTradingWebSocket(io) {
+export default function setupColorGameWebSocket(io) {
   let currentRound = new GameRound();
   const roundHistory = [];
   let timerInterval = null;
@@ -47,17 +51,11 @@ export default function setupTradingWebSocket(io) {
 
     // Start new round
     currentRound = new GameRound();
-    // io.emit("newRound", {
-    //   roundId: currentRound.roundId,
-    //   startedAt: currentRound.createdAt,
-    //   history: roundHistory.slice(-5), // Send last 5 rounds for display
-    // });
-
-    io.emit("risefall_newRound", {
+    io.emit("color_newRound", {
       roundId: currentRound.roundId,
       startedAt: currentRound.createdAt,
-      serverTime: Date.now(), // Add this
-      history: roundHistory.slice(-5),
+      serverTime: Date.now(),
+      history: roundHistory.slice(-10),
     });
 
     // Schedule next round end
@@ -68,23 +66,45 @@ export default function setupTradingWebSocket(io) {
   const endCurrentRound = async () => {
     currentRound.endedAt = new Date();
 
-    // Determine result (50/50 chance)
-    currentRound.result = Math.random() < 0.5 ? "up" : "down";
-    // currentRound.result = "up";
+    // // Determine result (30% blue, 35% red, 35% green)
+    // const random = Math.random();
+    // if (random < 0.3) {
+    //   currentRound.result = "blue";
+    // } else if (random < 0.65) {
+    //   currentRound.result = "red";
+    // } else {
+    //   currentRound.result = "green";
+    // }
 
-    // 2. Get all pending bets for this round
+    // const random = Math.random();
+
+    // if (random < 0.1) {
+    //   currentRound.result = "blue"; // 10%
+    // } else if (random < 0.45) {
+    //   currentRound.result = "green"; // 35% (10% to 45%)
+    // } else {
+    //   currentRound.result = "red"; // 55% (rest)
+    // }
+
+    const random = Math.random();
+
+    if (random < 0.1) {
+      currentRound.result = "blue"; // 10%
+    } else {
+      // From 10% to 100% → randomly choose green or red
+      currentRound.result = Math.random() < 0.5 ? "green" : "red"; // 45% each
+    }
+
+    // Process all pending bets
     const pendingBets = await UserBetHistory.find({
       roundId: currentRound.roundId,
       result: "pending",
     });
 
-    // 3. Process each bet
     const bulkUpdates = [];
-    // const winners = [];
-
     for (const bet of pendingBets) {
       const isWinner = bet.choice === currentRound.result;
-      const payout = isWinner ? bet.amount * 1.95 : 0;
+      const payout = isWinner ? bet.amount * PAYOUTS[bet.choice] : 0;
 
       bulkUpdates.push({
         updateOne: {
@@ -98,11 +118,8 @@ export default function setupTradingWebSocket(io) {
           },
         },
       });
-
-      // if (isWinner) winners.push({ userId: bet.userId, payout });
     }
 
-    // 4. Execute all updates in bulk
     if (bulkUpdates.length > 0) {
       await UserBetHistory.bulkWrite(bulkUpdates);
     }
@@ -113,7 +130,7 @@ export default function setupTradingWebSocket(io) {
     );
     const updatePromises = winners.map(async (player) => {
       try {
-        const payout = player.amount * 1.95;
+        const payout = player.amount * PAYOUTS[player.choice];
         await User.findByIdAndUpdate(player.userId, {
           $inc: { balance: payout },
         });
@@ -129,22 +146,22 @@ export default function setupTradingWebSocket(io) {
     await Promise.all(updatePromises);
 
     // Emit results
-    io.emit("risefall_roundResult", {
+    io.emit("color_roundResult", {
       roundId: currentRound.roundId,
       result: currentRound.result,
       totals: currentRound.totals,
-      history: roundHistory.slice(-5),
+      history: roundHistory.slice(-10),
     });
 
     // Notify individual players
     currentRound.players.forEach((player) => {
       const isWinner = player.choice === currentRound.result;
-      const winAmount = isWinner ? player.amount * 1.95 : 0;
+      const winAmount = isWinner ? player.amount * PAYOUTS[player.choice] : 0;
 
-      io.to(player.userId.toString()).emit("risefall_roundOutcome", {
+      io.to(player.userId.toString()).emit("color_roundOutcome", {
         result: isWinner ? "win" : "lose",
         choice: player.choice,
-        winningSide: currentRound.result,
+        winningColor: currentRound.result,
         amount: winAmount,
         message: isWinner
           ? `🎉 You won ₹${winAmount.toFixed(2)}!`
@@ -157,124 +174,76 @@ export default function setupTradingWebSocket(io) {
   };
 
   io.on("connection", (socket) => {
-    // console.log("New client connected:", socket.id);
-
-    // Register user and join room
-    socket.on("risefall_registerUser", (roomName) => {
-      // if (!userId) return;
-      // console.log("User registered:", roomName);
-
+    // Register user
+    socket.on("color_registerUser", (roomName) => {
       socket.join(roomName);
 
-      // Modify the gameState emission to include precise timing
-      socket.emit("risefall_gameState", {
+      socket.emit("color_gameState", {
         currentRound: {
           roundId: currentRound.roundId,
           startedAt: currentRound.createdAt,
-          timeLeft: getTimeRemaining(currentRound), // Add this
-          serverTime: Date.now(), // Add server timestamp
+          timeLeft: getTimeRemaining(currentRound),
+          serverTime: Date.now(),
         },
-        history: roundHistory.slice(-5),
+        history: roundHistory.slice(-10),
       });
     });
 
     // Handle bet placement
-    socket.on("placeBetForex", async ({ userId, choice, amount }) => {
-      // console.log("hello we are in forex tree place bet");
+    socket.on("placeColorBet", async ({ userId, choice, amount }) => {
       try {
-        // Validate
         if (currentRound.endedAt) {
-          return socket.emit("risefall_error", "Round has ended");
+          return socket.emit("color_error", "Round has ended");
         }
-        if (!["up", "down"].includes(choice)) {
-          return socket.emit("risefall_error", "Invalid choice");
+        if (!["red", "green", "blue"].includes(choice)) {
+          return socket.emit("color_error", "Invalid choice");
         }
         if (isNaN(amount) || amount < 1) {
-          return socket.emit("risefall_error", "Invalid amount");
+          return socket.emit("color_error", "Invalid amount");
         }
 
         socket.join(userId.toString());
 
         // Check balance
         const user = await User.findById(userId);
-        if (!user) return socket.emit("risefall_error", "User not found");
+        if (!user) return socket.emit("color_error", "User not found");
+        if (user.balance < amount) {
+          return socket.emit("color_error", "Insufficient balance");
+        }
 
+        // Record bet
         const betRecord = new UserBetHistory({
-          gameType: "ForexTree",
+          gameType: "ColorPrediction",
           userId,
           roundId: currentRound.roundId,
           choice,
           amount,
-          // betAmount: amount,
           result: "pending",
         });
         await betRecord.save();
-        if (user.balance < amount) {
-          return socket.emit("risefall_error", "Insufficient balance");
-        }
 
-        // // Deduct balance
-        // await User.findByIdAndUpdate(userId, {
-        //   $inc: { balance: -amount,
+        // Deduct balance
+        await User.findByIdAndUpdate(userId, {
+          $inc: { balance: -amount },
+        });
 
-        //    },
-
-        // });
-
-        // Use lean for faster fetch (no Mongoose wrapper)
-        const userDoc = await User.findById(userId)
-          .select("balance bonusAmount bonusPlayedAmount")
-          .lean();
-
-        if (!userDoc) {
-          return socket.emit("risefall_error", "User not found");
-        }
-
-        // Prepare updated values (logic offloaded here)
-        const newBalance = userDoc.balance - amount;
-        let updatedBonusAmount = userDoc.bonusAmount;
-        let updatedBonusPlayed = userDoc.bonusPlayedAmount;
-
-        if (userDoc.bonusAmount > 0) {
-          if (userDoc.bonusAmount >= amount) {
-            updatedBonusAmount -= amount;
-            updatedBonusPlayed += amount;
-          } else {
-            updatedBonusPlayed += updatedBonusAmount;
-            updatedBonusAmount = 0;
-          }
-        }
-
-        // Update only required fields (atomic update)
-        await User.updateOne(
-          { _id: userId },
-          {
-            $set: {
-              balance: newBalance,
-              bonusAmount: updatedBonusAmount,
-              bonusPlayedAmount: updatedBonusPlayed,
-            },
-          }
-        );
-
-        // Record bet
+        // Update round data
         currentRound.players.push({ userId, choice, amount });
         currentRound.totals[choice] += amount;
 
         // Notify user
-        socket.emit("risefall_betPlaced", { amount, choice });
-        socket.emit("risefall_balanceUpdate", {
+        socket.emit("color_betPlaced", { amount, choice });
+        socket.emit("color_balanceUpdate", {
           balance: user.balance - amount,
         });
       } catch (error) {
-        // console.log("error msg is ", error);
         console.error("Error placing bet:", error);
-        socket.emit("risefall_error", "Failed to place bet");
+        socket.emit("color_error", "Failed to place bet");
       }
     });
 
     socket.on("disconnect", () => {
-      // console.log("Client disconnected:", socket.id);
+      // Handle disconnect
     });
   });
 

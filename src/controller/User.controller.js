@@ -8,16 +8,16 @@ import { UserBetHistory } from "../model/UserBetHistory.model.js";
 
 export const DipositMoney = async (req, res) => {
   try {
-    console.log("hello java bro");
+    // console.log("hello java bro");
     const { amount, transactionId } = req.body;
     const PaymentScreenShot = req.files?.image; // Assuming you're using multer for file uploads
-    console.log("PaymentScreenShot", PaymentScreenShot);
+    // console.log("PaymentScreenShot", PaymentScreenShot);
 
     if (!PaymentScreenShot) {
       return res.status(400).json({ error: "No file uploaded" });
     }
     const userId = req.user.id; // From middleware (auth)
-    console.log("userId", userId);
+    // console.log("userId", userId);
 
     // ✅ Validate required fields
     if (!amount || !transactionId || !PaymentScreenShot) {
@@ -32,14 +32,14 @@ export const DipositMoney = async (req, res) => {
       isUpload: true,
     });
 
-    console.log("uploadedImage", uploadedImage);
+    // console.log("uploadedImage", uploadedImage);
 
     if (!uploadedImage) {
       return res.status(500).json({ message: "Failed to upload image" });
     }
     // ✅ Save the image URL to the database
     const imageUrl = uploadedImage.secure_url; // Get the URL from the upload response
-    console.log("imageUrl", imageUrl);
+    // console.log("imageUrl", imageUrl);
 
     // ✅ Check if user exists
     const user = await User.findById(userId);
@@ -47,7 +47,7 @@ export const DipositMoney = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // console.log("payment screenshot", PaymentScreenShot);
+    console.log("payment screenshot", PaymentScreenShot);
     // ✅ Create new deposit document
     const newDeposit = new Deposit({
       amount,
@@ -105,14 +105,8 @@ export const getUserDeposits = async (req, res) => {
 export const withdrawMoney = async (req, res) => {
   try {
     const { amount, transactionId } = req.body;
-    // const PaymentScreenShot = req.files?.image;
-    const userId = req.user.id;
 
-    // console.log("PaymentScreenShot", PaymentScreenShot);
-    console.log("amount", amount);
-    // console.log("transactionId", transactionId);
-    console.log("userId", userId);
-    // ✅ Validate required fields
+    const userId = req.user.id;
 
     if (!amount) {
       return res.status(400).json({ message: "All fields are required" });
@@ -128,8 +122,6 @@ export const withdrawMoney = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    // ✅ Check if user has sufficient balance
-    console.log("user.balance", user.balance);
 
     if (user.balance < amount) {
       return res.status(400).json({ message: "Insufficient balance" });
@@ -138,21 +130,6 @@ export const withdrawMoney = async (req, res) => {
     // remove the amount from user balance
     user.balance -= amount;
     await user.save();
-
-    // const uploadedImage = await uploadInCloudinary({
-    //   data: PaymentScreenShot.tempFilePath,
-    //   folder: "Withdraw_payment_screenshots",
-    //   isUpload: true,
-    // });
-
-    // console.log("uploadedImage", uploadedImage);
-
-    // if (!uploadedImage) {
-    //   return res.status(500).json({ message: "Failed to upload image" });
-    // }
-    // // ✅ Save the image URL to the database
-    // const imageUrl = uploadedImage.secure_url; // Get the URL from the upload response
-    // console.log("imageUrl", imageUrl);
 
     // ✅ Create new withdraw document
     const newWithdraw = new WithdrawHistory({
@@ -195,11 +172,11 @@ export const SaveUserBankDetails = async (req, res) => {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    console.log("bankName", bankName);
-    console.log("accountHolderName", accountHolderName);
-    console.log("accountNumber", accountNumber);
-    console.log("ifscCode", ifscCode);
-    console.log("userId", userId);
+    // console.log("bankName", bankName);
+    // console.log("accountHolderName", accountHolderName);
+    // console.log("accountNumber", accountNumber);
+    // console.log("ifscCode", ifscCode);
+    // console.log("userId", userId);
 
     // Validate required fields
     if (!bankName || !accountHolderName || !accountNumber || !ifscCode) {
@@ -220,7 +197,7 @@ export const SaveUserBankDetails = async (req, res) => {
 
     const savedBankDetail = await newBankDetail.save();
 
-    console.log("savedBankDetail", savedBankDetail);
+    // console.log("savedBankDetail", savedBankDetail);
 
     const updatedUserData = await User.findByIdAndUpdate(
       userId,
@@ -263,7 +240,7 @@ export const getUserBankDetails = async (req, res) => {
 
     // Fetch bank details for the user
     const bankDetails = await BankDetail.findOne({ user: userId });
-    console.log("bankDetails", bankDetails);
+    // console.log("bankDetails", bankDetails);
     if (!bankDetails) {
       return res.status(404).json({
         success: false,
@@ -381,11 +358,10 @@ export const getUserBetHistoryHeadTail = async (req, res) => {
       data: history,
     });
   } catch (error) {
-    console.log("Error fetching history:", error);
+    // console.log("Error fetching history:", error);
     res.status(500).json({ error: "Failed to fetch history" });
   }
 };
-
 
 // controllers/betHistory.controller.js
 
@@ -394,12 +370,12 @@ export const getUserBetHistoryByGameType = async (req, res) => {
     const userId = req.user.id;
     const { gameType } = req.params; // or req.query if you prefer query params
 
-    const history = await UserBetHistory.find({ 
+    const history = await UserBetHistory.find({
       userId: userId,
-      gameType: gameType 
+      gameType: gameType,
     })
-    .sort({ createdAt: -1 })
-    .limit(20);
+      .sort({ createdAt: -1 })
+      .limit(20);
 
     res.json({
       success: true,
@@ -408,10 +384,10 @@ export const getUserBetHistoryByGameType = async (req, res) => {
       data: history,
     });
   } catch (error) {
-    console.log("Error fetching history:", error);
-    res.status(500).json({ 
+    // console.log("Error fetching history:", error);
+    res.status(500).json({
       success: false,
-      error: "Failed to fetch history" 
+      error: "Failed to fetch history",
     });
   }
 };
